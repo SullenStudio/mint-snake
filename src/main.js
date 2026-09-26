@@ -10,8 +10,9 @@ const ROWS = 22;
 const BOARD_W = COLS * CELL;
 const BOARD_H = ROWS * CELL;
 const OX = Math.round((W - BOARD_W) / 2);
-const OY = 168;
+const OY = 148;
 const FONT = "Outfit";
+const JOY = { x: W / 2, y: 878, r: 64, knob: 26, dead: 16 };
 
 const k = kaplay({
   global: false,
@@ -139,6 +140,15 @@ k.scene("menu", () => {
     k.pos(32, 460),
     k.color(C.mute),
   ]);
+  k.add([
+    k.text("Phone: use the stick under the grid.", {
+      size: 16,
+      font: FONT,
+      width: 460,
+    }),
+    k.pos(32, 490),
+    k.color(C.mute),
+  ]);
 
   const cta = k.add([
     k.rect(476, 72, { radius: 20 }),
@@ -147,7 +157,7 @@ k.scene("menu", () => {
     k.area(),
   ]);
   k.add([
-    k.text("TAP  /  SPACE   START", { size: 20, font: FONT }),
+    k.text("TAP  /  SPACE   START", { size: 18, font: FONT }),
     k.pos(W / 2, 868),
     k.anchor("center"),
     k.color(9, 12, 11),
@@ -158,6 +168,14 @@ k.scene("menu", () => {
   cta.onClick(startGame);
 });
 
+function ease(t) {
+  return t * t * (3 - 2 * t);
+}
+
+function copyBody(body) {
+  return body.map((p) => ({ x: p.x, y: p.y }));
+}
+
 k.scene("game", () => {
   drawChrome("MINT SNAKE");
 
@@ -166,6 +184,7 @@ k.scene("game", () => {
     { x: 4, y: 10 },
     { x: 3, y: 10 },
   ];
+  let fromSnake = copyBody(snake);
   let dir = { x: 1, y: 0 };
   let nextDir = { x: 1, y: 0 };
   let food = spawnFood(snake);
@@ -174,8 +193,12 @@ k.scene("game", () => {
   let alive = true;
   let wrapLeft = 0;
   let speedLeft = 0;
-  let step = 0.14;
+  let step = 0.16;
   let acc = 0;
+  let joyActive = false;
+  let joyPull = k.vec2(0, 0);
+  let ignorePad = 0.45;
+  let primed = false;
 
   k.add([
     k.text("0", { size: 26, font: FONT }),
@@ -185,10 +208,10 @@ k.scene("game", () => {
     "score",
   ]);
   k.add([
-    k.text("EAT", { size: 16, font: FONT }),
+    k.text("STEER", { size: 16, font: FONT }),
     k.pos(W - 32, 116),
     k.anchor("right"),
-    k.color(C.mute),
+    k.color(C.mint),
     k.fixed(),
     "status",
   ]);
@@ -212,8 +235,41 @@ k.scene("game", () => {
   }
 
   function setDir(x, y) {
-    if (dir.x + x === 0 && dir.y + y === 0) return;
+    if (primed && dir.x + x === 0 && dir.y + y === 0) return;
     nextDir = { x, y };
+    if (!primed) {
+      primed = true;
+      if (statusText.text === "STEER") {
+        statusText.text = "EAT";
+        statusText.color = C.mute;
+      }
+    }
+  }
+
+  function joyCenter() {
+    return k.vec2(JOY.x, JOY.y);
+  }
+
+  function hitJoy(pos) {
+    return pos.dist(joyCenter()) <= JOY.r + 20;
+  }
+
+  function steerFromVec(vx, vy) {
+    if (Math.abs(vx) < 0.01 && Math.abs(vy) < 0.01) return;
+    if (Math.abs(vx) > Math.abs(vy)) setDir(Math.sign(vx), 0);
+    else setDir(0, Math.sign(vy));
+  }
+
+  function pullJoy(pos) {
+    const delta = pos.sub(joyCenter());
+    const len = delta.len();
+    if (len < JOY.dead) {
+      joyPull = k.vec2(0, 0);
+      return;
+    }
+    const clamped = Math.min(len, JOY.r - 8);
+    joyPull = delta.unit().scale(clamped);
+    steerFromVec(joyPull.x, joyPull.y);
   }
 
   k.onKeyPress("left", () => setDir(-1, 0));
@@ -227,15 +283,31 @@ k.scene("game", () => {
 
   let swipe = null;
   k.onMouseDown(() => {
-    swipe = k.mousePos();
+    if (ignorePad > 0) return;
+    const pos = k.mousePos();
+    if (hitJoy(pos)) {
+      joyActive = true;
+      swipe = null;
+      pullJoy(pos);
+      return;
+    }
+    swipe = pos;
   });
   k.onMouseRelease(() => {
-    if (!swipe) return;
+    if (joyActive) {
+      joyActive = false;
+      joyPull = k.vec2(0, 0);
+      swipe = null;
+      return;
+    }
+    if (ignorePad > 0 || !swipe) {
+      swipe = null;
+      return;
+    }
     const d = k.mousePos().sub(swipe);
     swipe = null;
     if (d.len() < 20) return;
-    if (Math.abs(d.x) > Math.abs(d.y)) setDir(Math.sign(d.x), 0);
-    else setDir(0, Math.sign(d.y));
+    steerFromVec(d.x, d.y);
   });
 
   function die() {
@@ -249,7 +321,7 @@ k.scene("game", () => {
     combo += 1;
     let gain = 10;
     if (kind === "energy") {
-      step = 0.07;
+      step = 0.08;
       speedLeft = 4;
       statusText.text = "VOLT";
       statusText.color = C.energy;
@@ -277,13 +349,17 @@ k.scene("game", () => {
   }
 
   k.onUpdate(() => {
-    if (!alive) return;
-    wrapLeft = Math.max(0, wrapLeft - k.dt());
-    speedLeft = Math.max(0, speedLeft - k.dt());
-    if (speedLeft === 0) step = 0.14;
-    acc += k.dt();
+    const dt = k.dt();
+    ignorePad = Math.max(0, ignorePad - dt);
+    if (ignorePad === 0 && joyActive && k.isMouseDown()) pullJoy(k.mousePos());
+    if (!alive || !primed) return;
+    wrapLeft = Math.max(0, wrapLeft - dt);
+    speedLeft = Math.max(0, speedLeft - dt);
+    if (speedLeft === 0) step = 0.16;
+    acc += dt;
     if (acc < step) return;
-    acc = 0;
+    acc -= step;
+    fromSnake = copyBody(snake);
     dir = nextDir;
 
     const head = snake[0];
@@ -366,8 +442,15 @@ k.scene("game", () => {
       });
     }
 
+    const t = alive ? ease(Math.min(1, acc / step)) : 1;
+
     for (let i = snake.length - 1; i >= 0; i--) {
-      const p = cellOrigin(snake[i].x, snake[i].y);
+      const to = snake[i];
+      const from = fromSnake[i] || to;
+      const wrapped = Math.abs(from.x - to.x) > 1 || Math.abs(from.y - to.y) > 1;
+      const px = wrapped ? to.x : from.x + (to.x - from.x) * t;
+      const py = wrapped ? to.y : from.y + (to.y - from.y) * t;
+      const p = k.vec2(OX + px * CELL, OY + py * CELL);
       const pad = i === 0 ? 3 : 4;
       const isHead = i === 0;
       k.drawRect({
@@ -386,7 +469,7 @@ k.scene("game", () => {
         outline: { width: 2, color: C.mintDeep },
       });
       if (isHead) {
-        const c = cellCenter(snake[i].x, snake[i].y);
+        const c = p.add(CELL / 2, CELL / 2);
         const ox = dir.x * 4;
         const oy = dir.y * 4;
         k.drawCircle({
@@ -412,6 +495,42 @@ k.scene("game", () => {
       pos: f,
       radius: 7,
       color: food.color,
+    });
+
+    const base = joyCenter();
+    k.drawCircle({
+      pos: base,
+      radius: JOY.r,
+      color: k.rgb(12, 20, 17),
+    });
+    k.drawCircle({
+      pos: base,
+      radius: JOY.r,
+      fill: false,
+      outline: { width: 3, color: joyActive ? C.mint : C.line },
+    });
+    [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ].forEach(([dx, dy]) => {
+      k.drawCircle({
+        pos: base.add(dx * 36, dy * 36),
+        radius: 3,
+        color: C.mintDim,
+      });
+    });
+    k.drawCircle({
+      pos: base.add(joyPull),
+      radius: JOY.knob,
+      color: joyActive ? C.mintHi : C.mint,
+    });
+    k.drawCircle({
+      pos: base.add(joyPull),
+      radius: JOY.knob,
+      fill: false,
+      outline: { width: 2, color: C.mintDeep },
     });
   });
 });
