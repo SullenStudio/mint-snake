@@ -1,4 +1,5 @@
 import kaplay from "kaplay";
+import outfitUrl from "./assets/Outfit-Bold.ttf?url";
 
 const BEST_KEY = "sullen-mint-snake-best";
 const W = 540;
@@ -10,6 +11,7 @@ const BOARD_W = COLS * CELL;
 const BOARD_H = ROWS * CELL;
 const OX = Math.round((W - BOARD_W) / 2);
 const OY = 168;
+const FONT = "Outfit";
 
 const k = kaplay({
   global: false,
@@ -19,11 +21,11 @@ const k = kaplay({
   crisp: true,
   pixelDensity: Math.min(window.devicePixelRatio || 1, 2),
   background: [9, 12, 11],
-  font: "outfit",
+  font: "sans-serif",
   touchToMouse: true,
 });
 
-k.loadFont("outfit", "/fonts/Outfit-Bold.ttf");
+k.loadFont("Outfit", outfitUrl, { filter: "linear" });
 
 const C = {
   mint: k.rgb(10, 184, 118),
@@ -70,13 +72,13 @@ function cellCenter(x, y) {
 function drawChrome(title) {
   k.add([k.rect(W, H), k.pos(0, 0), k.color(9, 12, 11), k.fixed()]);
   k.add([
-    k.text("SULLEN STUDIO", { size: 16, font: "outfit" }),
+    k.text("SULLEN STUDIO", { size: 16, font: FONT }),
     k.pos(32, 28),
     k.color(C.mute),
     k.fixed(),
   ]);
   k.add([
-    k.text(title, { size: 40, font: "outfit" }),
+    k.text(title, { size: 40, font: FONT }),
     k.pos(32, 52),
     k.color(C.ink),
     k.fixed(),
@@ -112,26 +114,26 @@ k.scene("menu", () => {
       k.color(food.color),
     ]);
     k.add([
-      k.text(row[0].toUpperCase(), { size: 20, font: "outfit" }),
+      k.text(row[0].toUpperCase(), { size: 20, font: FONT }),
       k.pos(92, 160 + i * 54),
       k.color(C.ink),
     ]);
     k.add([
-      k.text(row[1], { size: 16, font: "outfit" }),
+      k.text(row[1], { size: 16, font: FONT }),
       k.pos(92, 184 + i * 54),
       k.color(C.mute),
     ]);
   });
 
   k.add([
-    k.text(`BEST   ${readBest()}`, { size: 22, font: "outfit" }),
+    k.text(`BEST   ${readBest()}`, { size: 22, font: FONT }),
     k.pos(32, 424),
     k.color(C.mint),
   ]);
   k.add([
     k.text("Combo every 3 snacks = x2 burst.", {
       size: 16,
-      font: "outfit",
+      font: FONT,
       width: 460,
     }),
     k.pos(32, 460),
@@ -145,7 +147,7 @@ k.scene("menu", () => {
     k.area(),
   ]);
   k.add([
-    k.text("TAP  /  SPACE   START", { size: 20, font: "outfit" }),
+    k.text("TAP  /  SPACE   START", { size: 20, font: FONT }),
     k.pos(W / 2, 868),
     k.anchor("center"),
     k.color(9, 12, 11),
@@ -176,14 +178,14 @@ k.scene("game", () => {
   let acc = 0;
 
   k.add([
-    k.text("0", { size: 26, font: "outfit" }),
+    k.text("0", { size: 26, font: FONT }),
     k.pos(32, 112),
     k.color(C.mint),
     k.fixed(),
     "score",
   ]);
   k.add([
-    k.text("EAT", { size: 16, font: "outfit" }),
+    k.text("EAT", { size: 16, font: FONT }),
     k.pos(W - 32, 116),
     k.anchor("right"),
     k.color(C.mute),
@@ -417,13 +419,13 @@ k.scene("game", () => {
 k.scene("over", ({ score, best }) => {
   drawChrome("GAME OVER");
   k.add([
-    k.text(String(score), { size: 88, font: "outfit" }),
+    k.text(String(score), { size: 88, font: FONT }),
     k.pos(W / 2, 360),
     k.anchor("center"),
     k.color(C.mint),
   ]);
   k.add([
-    k.text(`BEST   ${best}`, { size: 22, font: "outfit" }),
+    k.text(`BEST   ${best}`, { size: 22, font: FONT }),
     k.pos(W / 2, 444),
     k.anchor("center"),
     k.color(C.mute),
@@ -436,7 +438,7 @@ k.scene("over", ({ score, best }) => {
     k.area(),
   ]);
   k.add([
-    k.text("AGAIN", { size: 22, font: "outfit" }),
+    k.text("AGAIN", { size: 22, font: FONT }),
     k.pos(W / 2, 784),
     k.anchor("center"),
     k.color(9, 12, 11),
@@ -449,7 +451,7 @@ k.scene("over", ({ score, best }) => {
     k.area(),
   ]);
   k.add([
-    k.text("MENU", { size: 18, font: "outfit" }),
+    k.text("MENU", { size: 18, font: FONT }),
     k.pos(W / 2, 868),
     k.anchor("center"),
     k.color(C.ink),
@@ -461,4 +463,11 @@ k.scene("over", ({ score, best }) => {
   k.onKeyPress("enter", () => k.go("game"));
 });
 
-k.onLoad(() => k.go("menu"));
+k.onLoad(() => {
+  const start = () => k.go("menu");
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(start, start);
+    return;
+  }
+  start();
+});
