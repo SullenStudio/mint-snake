@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-**Move:** arrows / WASD / swipe, or the stick under the grid on phone.
+**Move:** arrows / WASD / swipe, or the direction pad under the grid on phone.
 **Pause:** `P` or `Esc`.
 
 | Snack | Shape | Effect |
@@ -40,19 +40,30 @@ Best scores live in `localStorage` (and the game still runs if that is blocked).
 
 ```
 src/
-  game/
-    logic.js    pure rules — no kaplay, no DOM, no wall clock
-    rng.js      seeded PRNG + daily seed / day number
-    storage.js  localStorage wrapper that never throws
-    share.js    the one-line result brag
-  audio.js      synthesised blips (no audio assets)
-  main.js       kaplay rendering and input
-tests/          vitest, covering everything under src/game
+  game/              pure rules — no kaplay, no DOM, no wall clock
+    logic.js         step, collisions, snacks, chain, difficulty curve
+    rng.js           seeded PRNG + daily seed / day number
+    storage.js       localStorage wrapper that never throws
+    share.js         the one-line result brag
+  ui/
+    theme.js         palette, colour ramps, neon glow primitives
+    layout.js        screen and board geometry
+    snacks.js        snack glyphs
+    controls.js      the direction pad: geometry, hit testing, drawing
+    widgets.js       buttons, drifting background, wordmark
+  scenes/            menu.js, game.js, over.js
+  audio.js           synthesised blips (no audio assets)
+  main.js            kaplay init and scene registration
+tests/               vitest, covering src/game and the pure parts of src/ui
 ```
 
-`main.js` owns pixels and input only. Everything that decides what happens in a
-run lives in `src/game/logic.js`, drives off an injected `dt`, and emits events
-(`eat`, `die`, `comboLost`) that the renderer turns into sound and effects.
+`scenes/` and `ui/` own pixels and input only. Everything that decides what
+happens in a run lives in `src/game/logic.js`, drives off an injected `dt`, and
+emits events (`eat`, `die`, `comboLost`) that a scene turns into sound and
+effects.
+
+kaplay has no blur, so the neon glow is layered translucent copies of a shape
+(`theme.glowLayers`) rather than a shader.
 
 ## Test
 
