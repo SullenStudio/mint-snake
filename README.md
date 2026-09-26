@@ -18,10 +18,17 @@ npm run dev
 
 | Snack | Shape | Effect |
 | --- | --- | --- |
-| Apple | circle | grow, 10 pts |
-| Volt | bolt | 4s speed rush, 15 pts |
-| Pepper | triangle | 3s phase through walls, 10 pts |
+| Apple | circle | grow by 1, 10 pts |
+| Volt | bolt | grow + 4s speed rush, 15 pts |
+| Portal | ring | grow + 3s of no walls, 10 pts |
 | Bone | bone | −2 length, breaks the chain, 5 pts |
+
+Shape carries the meaning, not just colour. The portal used to be a pepper —
+testers read the orange triangle as a carrot, and no vegetable suggests
+"walk through walls". A ring you can see through does.
+
+In-game the rules live on their own **HOW TO PLAY** screen, reachable from the
+menu or with `H`.
 
 Three snacks sit on the board at once and at least one is always an apple, so
 which one you go for is a decision rather than a coin flip.
@@ -33,6 +40,10 @@ Let the timer run out, or eat a bone, and it resets.
 
 **Daily challenge:** the board is seeded from the UTC date, so everyone gets the
 same run on the same day, with its own best score.
+
+**Themes:** five neon palettes (mint, ice, amber, magenta, toxic), picked on the
+menu and remembered. Only the accent changes — snack colours stay fixed so they
+stay learnable.
 
 Best scores live in `localStorage` (and the game still runs if that is blocked).
 
@@ -51,7 +62,7 @@ src/
     snacks.js        snack glyphs
     controls.js      the direction pad: geometry, hit testing, drawing
     widgets.js       buttons, drifting background, wordmark
-  scenes/            menu.js, game.js, over.js
+  scenes/            menu.js, help.js, game.js, over.js
   audio.js           synthesised blips (no audio assets)
   main.js            kaplay init and scene registration
 tests/               vitest, covering src/game and the pure parts of src/ui
@@ -64,6 +75,12 @@ effects.
 
 kaplay has no blur, so the neon glow is layered translucent copies of a shape
 (`theme.glowLayers`) rather than a shader.
+
+Two kaplay input quirks are worked around in `scenes/game.js`: `onMouseDown`
+fires while a pointer is *held*, not on press, so fast taps were dropped
+entirely; and the touch-to-mouse emulation loses `mouseRelease` when `touchmove`
+events came in between, so swipes never completed. Input listens on the mouse
+and touch APIs both, with a gesture flag making the pair idempotent.
 
 ## Test
 

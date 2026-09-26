@@ -332,10 +332,10 @@ describe("volt", () => {
   });
 });
 
-describe("pepper", () => {
+describe("portal", () => {
   test("arms the wrap timer", () => {
     const state = bareGame();
-    forceEat(state, FOOD.PEPPER);
+    forceEat(state, FOOD.PORTAL);
     expect(state.wrapLeft).toBe(WRAP_TIME);
   });
 

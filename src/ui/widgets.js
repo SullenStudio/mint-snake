@@ -18,7 +18,7 @@ export function createWidgets(k, theme) {
     h = 72,
     label,
     size = 20,
-    fill = C.mint,
+    fill = C.accent,
     ink = C.bg,
     outline = null,
     z = 1,
@@ -88,7 +88,7 @@ export function createWidgets(k, theme) {
       x,
       y,
       glyph: () => (isMuted() ? "OFF" : "ON"),
-      accent: () => (isMuted() ? C.mute : C.mint),
+      accent: () => (isMuted() ? C.mute : C.accent),
       onPress: () => {
         setMuted(!isMuted());
         sfx.ui();
@@ -104,6 +104,11 @@ export function createWidgets(k, theme) {
     speed: 4 + ((i * 7) % 9),
   }));
 
+  /** kaplay's clear colour is set once at boot, so themes repaint it here. */
+  function drawBackdrop() {
+    k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: C.bg });
+  }
+
   function drawDrift(opacity = 0.16) {
     const t = k.time();
     for (const d of DOTS) {
@@ -111,7 +116,7 @@ export function createWidgets(k, theme) {
       k.drawCircle({
         pos: k.vec2(d.x * W, y - 20),
         radius: d.r,
-        color: C.mint,
+        color: C.accent,
         opacity: opacity * (0.4 + d.r * 0.2),
       });
     }
@@ -128,5 +133,12 @@ export function createWidgets(k, theme) {
     });
   }
 
-  return { button, iconButton, muteButton, drawDrift, drawWordmark };
+  return {
+    button,
+    iconButton,
+    muteButton,
+    drawBackdrop,
+    drawDrift,
+    drawWordmark,
+  };
 }

@@ -1,9 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { PAD, PAD_BUTTONS, hitPad } from "../src/ui/controls.js";
 
-/** Centre point of a named button. */
+function button(name) {
+  return PAD_BUTTONS.find((b) => b.name === name);
+}
+
 function centre(name) {
-  const b = PAD_BUTTONS.find((btn) => btn.name === name);
+  const b = button(name);
   return [b.x + PAD.size / 2, b.y + PAD.size / 2];
 }
 
@@ -26,29 +29,27 @@ describe("pad layout", () => {
   });
 
   test("is a symmetric cross about its centre", () => {
-    const [ux] = centre("up");
-    const [dx] = centre("down");
-    const [lx] = centre("left");
-    const [rx] = centre("right");
-    expect(ux).toBe(dx);
-    expect(ux).toBe(PAD.cx);
-    expect(PAD.cx - lx).toBe(rx - PAD.cx);
+    expect(centre("up")[0]).toBe(centre("down")[0]);
+    expect(centre("up")[0]).toBe(PAD.cx);
+    expect(PAD.cx - centre("left")[0]).toBe(centre("right")[0] - PAD.cx);
   });
 
   test("stacks up, the middle row, then down without overlapping", () => {
-    const up = PAD_BUTTONS.find((b) => b.name === "up");
-    const left = PAD_BUTTONS.find((b) => b.name === "left");
-    const down = PAD_BUTTONS.find((b) => b.name === "down");
-    expect(left.y).toBe(up.y + PAD.size + PAD.gap);
-    expect(down.y).toBe(left.y + PAD.size + PAD.gap);
+    expect(button("left").y).toBe(button("up").y + PAD.size + PAD.gap);
+    expect(button("down").y).toBe(button("left").y + PAD.size + PAD.gap);
   });
 
-  test("fits on screen above the bottom edge", () => {
+  test("fits on screen, clear of the board and the bottom edge", () => {
     for (const b of PAD_BUTTONS) {
       expect(b.x).toBeGreaterThanOrEqual(0);
-      expect(b.y + PAD.size).toBeLessThanOrEqual(960);
       expect(b.x + PAD.size).toBeLessThanOrEqual(540);
+      expect(b.y + PAD.size).toBeLessThanOrEqual(960);
     }
+  });
+
+  test("gives each button a comfortable thumb target", () => {
+    // 540 virtual px map to ~390pt on a phone, so 44pt needs ~61 virtual px.
+    expect(PAD.size).toBeGreaterThanOrEqual(80);
   });
 });
 
@@ -59,39 +60,51 @@ describe("hitPad", () => {
     }
   });
 
-  test("returns null in the hole at the centre of the cross", () => {
-    expect(hitPad(PAD.cx, PAD.top + PAD.size + PAD.gap / 2)).toBeNull();
+  test("forgives a thumb landing just outside a button", () => {
+    const up = button("up");
+    expect(hitPad(up.x - PAD.slop + 1, up.y + PAD.size / 2)?.name).toBe("up");
+    expect(hitPad(up.x + PAD.size / 2, up.y - PAD.slop + 1)?.name).toBe("up");
   });
 
-  test("returns null in the diagonal corners between buttons", () => {
-    const left = PAD_BUTTONS.find((b) => b.name === "left");
-    // Just above the left button, beside the up button.
-    expect(hitPad(left.x + 4, left.y - PAD.gap / 2)).toBeNull();
+  test("still misses well beyond the slop", () => {
+    const up = button("up");
+    expect(hitPad(up.x + PAD.size / 2, up.y - PAD.slop - 12)).toBeNull();
+  });
+
+  test("keeps a dead centre so the cross never guesses a direction", () => {
+    const mid = button("left").y + PAD.size / 2;
+    expect(hitPad(PAD.cx, mid)).toBeNull();
+  });
+
+  test("resolves the diagonal gap to one button, never to none", () => {
+    const up = button("up");
+    const corner = hitPad(up.x - 2, up.y + PAD.size + 2);
+    expect(corner).not.toBeNull();
+    expect(["up", "left"]).toContain(corner.name);
+  });
+
+  test("is deterministic for a repeated point", () => {
+    const up = button("up");
+    const p = [up.x - 2, up.y + PAD.size + 2];
+    expect(hitPad(...p).name).toBe(hitPad(...p).name);
   });
 
   test("returns null above the pad, where the board is", () => {
-    expect(hitPad(PAD.cx, PAD.top - 20)).toBeNull();
+    expect(hitPad(PAD.cx, PAD.top - 60)).toBeNull();
   });
 
   test("returns null off to the side of the pad", () => {
-    expect(hitPad(10, PAD.top + PAD.size + PAD.gap + PAD.size / 2)).toBeNull();
+    expect(hitPad(6, button("left").y + PAD.size / 2)).toBeNull();
   });
 
-  test("includes the top-left corner of a button but not the far edges", () => {
-    const up = PAD_BUTTONS.find((b) => b.name === "up");
-    expect(hitPad(up.x, up.y)?.name).toBe("up");
-    expect(hitPad(up.x + PAD.size, up.y)).toBeNull();
-    expect(hitPad(up.x, up.y + PAD.size)).toBeNull();
-  });
-
-  test("never reports two buttons for one point", () => {
-    for (let y = PAD.top - 20; y < 960; y += 3) {
-      for (let x = 0; x < 540; x += 3) {
-        const matches = PAD_BUTTONS.filter(
-          (b) =>
-            x >= b.x && x < b.x + PAD.size && y >= b.y && y < b.y + PAD.size,
-        );
-        expect(matches.length).toBeLessThanOrEqual(1);
+  test("never picks a button whose rect the point is far from", () => {
+    for (let y = PAD.top - 40; y < 960; y += 7) {
+      for (let x = 0; x < 540; x += 7) {
+        const hit = hitPad(x, y);
+        if (!hit) continue;
+        const dx = Math.max(hit.x - x, 0, x - (hit.x + PAD.size));
+        const dy = Math.max(hit.y - y, 0, y - (hit.y + PAD.size));
+        expect(Math.hypot(dx, dy)).toBeLessThanOrEqual(PAD.slop);
       }
     }
   });

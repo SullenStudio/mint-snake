@@ -55,7 +55,7 @@ export function registerOver(k, ctx) {
         label: () => shareLabel,
         size: 17,
         fill: C.panel,
-        ink: C.mintHi,
+        ink: C.accentHi,
         outline: C.line,
         enabled: ready,
         onPress: async () => {
@@ -84,6 +84,7 @@ export function registerOver(k, ctx) {
     ];
 
     k.onDraw(() => {
+      widgets.drawBackdrop();
       widgets.drawDrift(0.1);
       widgets.drawWordmark();
 
@@ -93,7 +94,7 @@ export function registerOver(k, ctx) {
         font: FONT,
         pos: k.vec2(MARGIN, 52),
         color: C.ink,
-        glow: isRecord ? C.volt : C.mint,
+        glow: isRecord ? C.volt : C.accent,
         intensity: 0.9,
       });
 
@@ -113,8 +114,8 @@ export function registerOver(k, ctx) {
         font: FONT,
         pos: k.vec2(W / 2, 248),
         anchor: "center",
-        color: isRecord ? C.volt : C.mintHi,
-        glow: isRecord ? C.volt : C.mint,
+        color: isRecord ? C.volt : C.accentHi,
+        glow: isRecord ? C.volt : C.accent,
         intensity: isRecord ? 1.6 : 1.1,
       });
 
@@ -182,7 +183,7 @@ export function registerOver(k, ctx) {
         font: FONT,
         pos: k.vec2(W / 2, 886),
         anchor: "center",
-        color: C.mintDim,
+        color: C.accentDim,
       });
     });
 

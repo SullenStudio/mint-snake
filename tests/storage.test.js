@@ -135,3 +135,27 @@ describe("hostile environments", () => {
     expect(() => store.bumpPlays()).not.toThrow();
   });
 });
+
+describe("theme choice", () => {
+  test("starts unset so the caller can pick its own default", () => {
+    expect(createStorage(memoryBackend()).readTheme()).toBeNull();
+  });
+
+  test("round-trips the chosen theme", () => {
+    const store = createStorage(memoryBackend());
+    store.writeTheme("amber");
+    expect(store.readTheme()).toBe("amber");
+  });
+
+  test("survives a backend that throws", () => {
+    const store = createStorage(hostileBackend);
+    expect(() => store.writeTheme("ice")).not.toThrow();
+    expect(store.readTheme()).toBeNull();
+  });
+
+  test("survives no backend at all", () => {
+    const store = createStorage(null);
+    expect(() => store.writeTheme("ice")).not.toThrow();
+    expect(store.readTheme()).toBeNull();
+  });
+});

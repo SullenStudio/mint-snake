@@ -1,25 +1,48 @@
-import { FOOD, VOLT_TIME, WRAP_TIME } from "../game/logic.js";
+import {
+  BONE_SHRINK,
+  FOOD,
+  SCORE,
+  VOLT_TIME,
+  WRAP_TIME,
+} from "../game/logic.js";
 
 /**
- * Shape carries the meaning here, not just colour — apple and pepper sit close
- * on the hue wheel, and some players cannot tell them apart at all.
+ * Shape carries the meaning here, not just colour — testers could not tell the
+ * old orange triangle from a carrot, and no vegetable suggests "walk through
+ * walls". A portal ring says what it does before anyone reads the legend.
  */
 export const SNACK = {
-  [FOOD.APPLE]: { key: "apple", name: "APPLE", hint: "grow  ·  10 pts" },
-  [FOOD.VOLT]: { key: "volt", name: "VOLT", hint: `rush ${VOLT_TIME}s  ·  15 pts` },
-  [FOOD.PEPPER]: {
-    key: "pepper",
-    name: "PEPPER",
-    hint: `phase walls ${WRAP_TIME}s  ·  10 pts`,
+  [FOOD.APPLE]: {
+    key: "apple",
+    name: "APPLE",
+    hint: "grow by 1",
+    detail: "Your snake gets one segment longer. The bread and butter.",
+  },
+  [FOOD.VOLT]: {
+    key: "volt",
+    name: "VOLT",
+    hint: `speed rush, ${VOLT_TIME}s`,
+    detail: `Grows you, then everything moves faster for ${VOLT_TIME} seconds. Worth more points — and much easier to crash.`,
+  },
+  [FOOD.PORTAL]: {
+    key: "portal",
+    name: "PORTAL",
+    hint: `walls stop existing, ${WRAP_TIME}s`,
+    detail: `Grows you, and for ${WRAP_TIME} seconds the walls stop existing: run off one edge and come back on the opposite one.`,
   },
   [FOOD.BONE]: {
     key: "bone",
     name: "BONE",
-    hint: "−2 length, breaks the chain",
+    hint: `lose ${BONE_SHRINK}, chain breaks`,
+    detail: `The one to dodge. Cuts ${BONE_SHRINK} segments off your tail and resets your chain to zero.`,
   },
 };
 
-export const SNACK_ORDER = [FOOD.APPLE, FOOD.VOLT, FOOD.PEPPER, FOOD.BONE];
+for (const [type, meta] of Object.entries(SNACK)) {
+  meta.points = SCORE[type];
+}
+
+export const SNACK_ORDER = [FOOD.APPLE, FOOD.VOLT, FOOD.PORTAL, FOOD.BONE];
 
 const BOLT = [
   [2, -10],
@@ -29,18 +52,13 @@ const BOLT = [
   [6, -2],
   [1, -2],
 ];
-const CHILI = [
-  [0, 9],
-  [-8, -6],
-  [8, -6],
-];
 
 export function snackColor(theme, type) {
   return theme.C[SNACK[type].key];
 }
 
 export function drawSnack(k, theme, type, at, { scale = 1, intensity = 1 } = {}) {
-  const { C, glowCircle, glowPoly } = theme;
+  const { C, glowCircle, glowPoly, glowRect } = theme;
   const color = snackColor(theme, type);
   const p = (x, y) => at.add(x * scale, y * scale);
 
@@ -57,36 +75,31 @@ export function drawSnack(k, theme, type, at, { scale = 1, intensity = 1 } = {})
   }
 
   if (type === FOOD.VOLT) {
-    glowPoly({
-      pts: BOLT.map(([x, y]) => k.vec2(x, y)),
-      pos: at,
-      color,
-      intensity,
-      scale,
-    });
+    glowPoly({ pts: BOLT.map(([x, y]) => k.vec2(x, y)), pos: at, color, intensity, scale });
     return;
   }
 
-  if (type === FOOD.PEPPER) {
-    glowPoly({
-      pts: CHILI.map(([x, y]) => k.vec2(x, y)),
+  if (type === FOOD.PORTAL) {
+    // Two concentric rings with nothing in the middle: a hole you pass through.
+    glowCircle({
       pos: at,
+      radius: 9 * scale,
       color,
       intensity,
-      scale,
+      fill: false,
+      outline: { width: 2.5 * scale, color },
     });
-    k.drawRect({
-      pos: p(-1.5, -11),
-      width: 3 * scale,
-      height: 5 * scale,
-      radius: 1.5 * scale,
-      color: C.leaf,
+    k.drawCircle({
+      pos: at,
+      radius: 4.5 * scale,
+      fill: false,
+      outline: { width: 2 * scale, color },
     });
     return;
   }
 
   // Bone: a bar with knuckles, readable even at one cell wide.
-  theme.glowRect({
+  glowRect({
     pos: p(-7, -2.5),
     width: 14 * scale,
     height: 5 * scale,

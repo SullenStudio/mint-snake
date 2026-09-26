@@ -4,7 +4,9 @@
 import { makeRng, randomSeed } from "./rng.js";
 
 export const COLS = 17;
-export const ROWS = 22;
+// 20 rows rather than 22: the extra 52px go to the direction pad, which
+// testers could not hit reliably at the old size.
+export const ROWS = 20;
 
 export const START_LENGTH = 3;
 export const MIN_LENGTH = 3;
@@ -14,14 +16,14 @@ export const FOOD_COUNT = 3;
 export const FOOD = {
   APPLE: "apple",
   VOLT: "volt",
-  PEPPER: "pepper",
+  PORTAL: "portal",
   BONE: "bone",
 };
 
 export const SCORE = {
   [FOOD.APPLE]: 10,
   [FOOD.VOLT]: 15,
-  [FOOD.PEPPER]: 10,
+  [FOOD.PORTAL]: 10,
   [FOOD.BONE]: 5,
 };
 
@@ -30,7 +32,7 @@ export const SCORE = {
 const WEIGHTS = [
   [FOOD.APPLE, 40],
   [FOOD.VOLT, 20],
-  [FOOD.PEPPER, 20],
+  [FOOD.PORTAL, 20],
   [FOOD.BONE, 20],
 ];
 const WEIGHT_TOTAL = WEIGHTS.reduce((sum, [, w]) => sum + w, 0);
@@ -132,7 +134,7 @@ export function createGame({ seed = randomSeed(), mode = "classic" } = {}) {
     eaten: {
       [FOOD.APPLE]: 0,
       [FOOD.VOLT]: 0,
-      [FOOD.PEPPER]: 0,
+      [FOOD.PORTAL]: 0,
       [FOOD.BONE]: 0,
     },
   };
@@ -178,7 +180,7 @@ function applyFood(state, food, events) {
     mult = comboMult(state.combo);
     gain *= mult;
     if (food.type === FOOD.VOLT) state.voltLeft = VOLT_TIME;
-    if (food.type === FOOD.PEPPER) state.wrapLeft = WRAP_TIME;
+    if (food.type === FOOD.PORTAL) state.wrapLeft = WRAP_TIME;
   }
 
   state.score += gain;

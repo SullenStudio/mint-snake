@@ -7,7 +7,7 @@ function run(overrides = {}) {
     mode: "classic",
     score: 240,
     bestCombo: 4,
-    eaten: { [FOOD.APPLE]: 12, [FOOD.VOLT]: 3, [FOOD.PEPPER]: 0, [FOOD.BONE]: 1 },
+    eaten: { [FOOD.APPLE]: 12, [FOOD.VOLT]: 3, [FOOD.PORTAL]: 0, [FOOD.BONE]: 1 },
     ...overrides,
   };
 }
@@ -25,7 +25,7 @@ describe("shareText", () => {
   });
 
   test("omits snacks that were never eaten", () => {
-    expect(shareText(run())).not.toContain("🌶️");
+    expect(shareText(run())).not.toContain("🌀");
   });
 
   test("reports the best combo multiplier", () => {

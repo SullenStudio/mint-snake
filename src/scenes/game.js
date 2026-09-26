@@ -34,6 +34,8 @@ import { bodyTint } from "../ui/theme.js";
 
 const CHAIN = { x: MARGIN, y: 86, w: 196, h: 12 };
 const SEG_R = (CELL - 6) / 2;
+const PRESS_FEEDBACK = 0.12;
+const SWIPE_MIN = 24;
 
 /** Set while the tab is hidden, so a run never dies off-screen. */
 let wentAway = false;
@@ -53,6 +55,7 @@ export function registerGame(k, ctx) {
     let paused = false;
     let overlay = [];
     let pressed = null;
+    let pressHold = 0;
     let swipe = null;
     // Swallow the press that launched the scene so it is not read as a swipe.
     let ignoreInput = 0.35;
@@ -79,7 +82,9 @@ export function registerGame(k, ctx) {
       if (paused || !state.alive) return;
       paused = true;
       pressed = null;
+      pressHold = 0;
       swipe = null;
+      gesturing = false;
       overlay = PAUSE_BUTTONS.map((b) => {
         const zone = k.add([
           k.rect(CONTENT_W, 72),
@@ -142,7 +147,7 @@ export function registerGame(k, ctx) {
             x: e.food.x,
             y: e.food.y,
             life: 0.7,
-            color: boosted ? C.mintHi : snackColor(theme, e.food.type),
+            color: boosted ? C.accentHi : snackColor(theme, e.food.type),
             label: boosted ? `+${e.gain}  ×${e.mult}` : `+${e.gain}`,
           });
           if (boosted) {
@@ -204,32 +209,52 @@ export function registerGame(k, ctx) {
       else steer(0, Math.sign(vy));
     }
 
-    k.onMouseDown(() => {
+    // Two bugs lived here.
+    //
+    // 1. onMouseDown fires every frame the pointer is HELD, not once on press.
+    //    kaplay batches touchstart and touchend into the same "input" tick, so
+    //    a quick tap could start and end without the handler ever running —
+    //    the "I tap and nothing happens" report.
+    // 2. kaplay's touch-to-mouse emulation drops the mouseRelease entirely
+    //    when touchmove events came in between, so swipes never completed.
+    //
+    // So: listen on both the mouse and the touch APIs, and make the pair
+    // idempotent with a gesture flag. Whichever fires first wins; the
+    // duplicate is ignored, and neither ordering nor a missing event matters.
+    let gesturing = false;
+
+    function beginPointer(pos) {
       resumeAudio();
-      if (ignoreInput > 0 || paused) return;
-      const pos = k.mousePos();
+      if (gesturing || ignoreInput > 0 || paused) return;
+      gesturing = true;
+
       const button = hitPad(pos.x, pos.y);
       if (button) {
-        // Fire on press, not release — turning should feel immediate.
+        // Act on press, not release — turning has to feel instant.
         pressed = button.name;
+        pressHold = PRESS_FEEDBACK;
         swipe = null;
         steer(button.dir.x, button.dir.y);
         buzz(8);
         return;
       }
-      swipe = pos;
-    });
+      swipe = k.vec2(pos.x, pos.y);
+    }
 
-    k.onMouseRelease(() => {
-      pressed = null;
-      if (ignoreInput > 0 || paused || !swipe) {
-        swipe = null;
-        return;
-      }
-      const d = k.mousePos().sub(swipe);
+    function endPointer(pos) {
+      if (!gesturing) return;
+      gesturing = false;
+      const start = swipe;
       swipe = null;
-      if (d.len() >= 20) steerFromVec(d.x, d.y);
-    });
+      if (!start || ignoreInput > 0 || paused) return;
+      const d = k.vec2(pos.x, pos.y).sub(start);
+      if (d.len() >= SWIPE_MIN) steerFromVec(d.x, d.y);
+    }
+
+    k.onMousePress(() => beginPointer(k.mousePos()));
+    k.onMouseRelease(() => endPointer(k.mousePos()));
+    k.onTouchStart((pos) => beginPointer(pos));
+    k.onTouchEnd((pos) => endPointer(pos));
 
     // ---------------------------------------------------------------- update
 
@@ -237,6 +262,10 @@ export function registerGame(k, ctx) {
       const dt = k.dt();
       ignoreInput = Math.max(0, ignoreInput - dt);
       multPop = Math.max(0, multPop - dt * 2.4);
+      // Hold the lit state briefly: a tap can be over before the next frame,
+      // and a button that never visibly reacts reads as a dropped input.
+      pressHold = Math.max(0, pressHold - dt);
+      if (pressHold === 0 && !k.isMouseDown()) pressed = null;
 
       for (let i = fx.length - 1; i >= 0; i--) {
         fx[i].t += dt;
@@ -262,9 +291,9 @@ export function registerGame(k, ctx) {
         height: BOARD_H + 16,
         radius: 20,
         color: k.rgb(3, 6, 5),
-        glow: phasing ? C.pepper : C.mint,
+        glow: phasing ? C.portal : C.accent,
         intensity: phasing ? 0.9 : 0.35,
-        outline: { width: 2, color: phasing ? C.pepper : C.line },
+        outline: { width: 2, color: phasing ? C.portal : C.line },
       });
 
       // Faint lattice — the light in this design comes from the snake, not the
@@ -275,7 +304,7 @@ export function registerGame(k, ctx) {
           p2: k.vec2(OX + x * CELL, OY + BOARD_H),
           width: 1,
           color: C.line,
-          opacity: 0.4,
+          opacity: 0.55,
         });
       }
       for (let y = 1; y < ROWS; y++) {
@@ -284,7 +313,7 @@ export function registerGame(k, ctx) {
           p2: k.vec2(OX + BOARD_W, OY + y * CELL),
           width: 1,
           color: C.line,
-          opacity: 0.4,
+          opacity: 0.55,
         });
       }
     }
@@ -316,13 +345,13 @@ export function registerGame(k, ctx) {
         k.drawCircle({
           pos: points[i].at,
           radius: SEG_R + 5,
-          color: C.mint,
+          color: C.accent,
           opacity: (rushing ? 0.16 : 0.1) * (1 - i / (len + 4)),
         });
       }
 
       for (let i = len - 1; i >= 1; i--) {
-        const color = tint(bodyTint(i, len));
+        const color = tint(bodyTint(i, len, theme.ramp()));
         k.drawCircle({ pos: points[i].at, radius: SEG_R, color });
         if (!points[i].jumped && !points[i - 1].jumped) {
           k.drawLine({
@@ -340,8 +369,8 @@ export function registerGame(k, ctx) {
       glowCircle({
         pos: head,
         radius: SEG_R + 1,
-        color: C.mintHi,
-        glow: C.mint,
+        color: C.accentHi,
+        glow: C.accent,
         intensity: rushing ? 1 : 0.65,
       });
       const { x: dx, y: dy } = state.dir;
@@ -400,8 +429,8 @@ export function registerGame(k, ctx) {
         size: 46,
         font: FONT,
         pos: k.vec2(MARGIN, 14),
-        color: C.mintHi,
-        glow: C.mint,
+        color: C.accentHi,
+        glow: C.accent,
         intensity: 1,
       });
       k.drawText({
@@ -416,7 +445,7 @@ export function registerGame(k, ctx) {
       const mult = comboMult(state.combo);
       const frac = state.comboLeft / COMBO_WINDOW;
       const live = state.combo > 0;
-      const accent = mult >= 4 ? C.volt : mult >= 3 ? C.mintHi : C.mint;
+      const accent = mult >= 4 ? C.volt : mult >= 3 ? C.accentHi : C.accent;
 
       k.drawRect({
         pos: k.vec2(CHAIN.x, CHAIN.y),
@@ -463,7 +492,7 @@ export function registerGame(k, ctx) {
         chips.push(["VOLT", state.voltLeft / VOLT_TIME, C.volt]);
       }
       if (state.wrapLeft > 0) {
-        chips.push(["PHASE", state.wrapLeft / WRAP_TIME, C.pepper]);
+        chips.push(["PHASE", state.wrapLeft / WRAP_TIME, C.portal]);
       }
       chips.forEach(([text, frac_, color], i) => {
         const x = W - MARGIN - 92 - i * 100;
@@ -513,7 +542,7 @@ export function registerGame(k, ctx) {
         pos: k.vec2(W / 2, 400),
         anchor: "center",
         color: C.ink,
-        glow: C.mint,
+        glow: C.accent,
         intensity: 1,
       });
       PAUSE_BUTTONS.forEach((b, i) => {
@@ -523,8 +552,8 @@ export function registerGame(k, ctx) {
           width: CONTENT_W,
           height: 72,
           radius: 22,
-          color: primary ? C.mint : C.panel,
-          glow: C.mint,
+          color: primary ? C.accent : C.panel,
+          glow: C.accent,
           intensity: primary ? 0.9 : 0.3,
           outline: primary ? null : { width: 2, color: C.line },
         });
@@ -540,6 +569,7 @@ export function registerGame(k, ctx) {
     }
 
     k.onDraw(() => {
+      widgets.drawBackdrop();
       widgets.drawDrift(0.07);
       drawBoard();
       for (const food of state.foods) {

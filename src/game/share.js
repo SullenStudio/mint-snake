@@ -3,11 +3,11 @@ import { FOOD, comboMult } from "./logic.js";
 const EMOJI = {
   [FOOD.APPLE]: "🍎",
   [FOOD.VOLT]: "⚡",
-  [FOOD.PEPPER]: "🌶️",
+  [FOOD.PORTAL]: "🌀",
   [FOOD.BONE]: "🦴",
 };
 
-const ORDER = [FOOD.APPLE, FOOD.VOLT, FOOD.PEPPER, FOOD.BONE];
+const ORDER = [FOOD.APPLE, FOOD.VOLT, FOOD.PORTAL, FOOD.BONE];
 
 /** One-line brag for the clipboard / Web Share sheet. */
 export function shareText(run, { day = null, isRecord = false, url = "" } = {}) {

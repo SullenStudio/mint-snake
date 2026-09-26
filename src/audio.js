@@ -59,7 +59,7 @@ function blip({ freq, to = freq, dur = 0.09, type = "square", gain = 0.06 }) {
 export const sfx = {
   apple: () => blip({ freq: 520, to: 800, dur: 0.08 }),
   volt: () => blip({ freq: 700, to: 1300, dur: 0.11, type: "sawtooth" }),
-  pepper: () => blip({ freq: 320, to: 660, dur: 0.14, type: "triangle" }),
+  portal: () => blip({ freq: 300, to: 900, dur: 0.16, type: "sine", gain: 0.07 }),
   bone: () => blip({ freq: 240, to: 110, dur: 0.18, gain: 0.05 }),
   combo: (mult) =>
     blip({

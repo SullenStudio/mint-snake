@@ -1,36 +1,42 @@
-import { resumeAudio } from "../audio.js";
-import { COMBO_WINDOW } from "../game/logic.js";
+import { resumeAudio, sfx } from "../audio.js";
 import { dailySeed, dayNumber, randomSeed } from "../game/rng.js";
 import { CONTENT_W, FONT, MARGIN, W } from "../ui/layout.js";
 import { SNACK, SNACK_ORDER, drawSnack } from "../ui/snacks.js";
+import { THEME_NAMES, THEMES } from "../ui/theme.js";
 
-const LEGEND_Y = 132;
-const ROW_H = 58;
-const CHAIN_Y = 396;
+const STRIP_Y = 168;
+const SWATCH = { y: 792, size: 48, gap: 14 };
 
 export function registerMenu(k, ctx) {
   const { theme, widgets, store } = ctx;
-  const { C, glowText, panel } = theme;
+  const { C, glowText, glowRect, panel } = theme;
 
   k.scene("menu", () => {
     const today = dailySeed();
     const day = dayNumber();
+    const playedToday = store.hasPlayedDaily(today);
 
     const play = (mode) =>
       k.go("game", { mode, seed: mode === "daily" ? today : randomSeed() });
 
+    const swatchX = (i) => {
+      const total =
+        THEME_NAMES.length * SWATCH.size + (THEME_NAMES.length - 1) * SWATCH.gap;
+      return (W - total) / 2 + i * (SWATCH.size + SWATCH.gap);
+    };
+
     const painted = [
       widgets.muteButton(W - MARGIN - 56, 22),
       widgets.button({
-        y: 600,
-        h: 88,
+        y: 430,
+        h: 92,
         label: "PLAY",
-        size: 26,
+        size: 27,
         onPress: () => play("classic"),
       }),
       widgets.button({
-        y: 706,
-        h: 72,
+        y: 540,
+        h: 74,
         label: `DAILY  ·  DAY #${day}`,
         size: 18,
         fill: C.panel,
@@ -38,112 +44,134 @@ export function registerMenu(k, ctx) {
         outline: C.volt,
         onPress: () => play("daily"),
       }),
+      widgets.button({
+        y: 632,
+        h: 66,
+        label: "HOW TO PLAY",
+        size: 17,
+        fill: C.panel,
+        ink: C.ink,
+        outline: C.line,
+        onPress: () => k.go("help"),
+      }),
     ];
 
+    // Swapping the palette mutates the shared colour table, but buttons capture
+    // their colours when they are built — so rebuild the scene after a change.
+    THEME_NAMES.forEach((name, i) => {
+      const zone = k.add([
+        k.rect(SWATCH.size, SWATCH.size),
+        k.pos(swatchX(i), SWATCH.y),
+        k.opacity(0),
+        k.area(),
+      ]);
+      zone.onClick(() => {
+        resumeAudio();
+        sfx.ui();
+        if (theme.name() === name) return;
+        theme.use(name);
+        store.writeTheme(name);
+        k.go("menu");
+      });
+    });
+
     k.onDraw(() => {
+      widgets.drawBackdrop();
       widgets.drawDrift();
       widgets.drawWordmark();
 
       glowText({
         text: "MINT SNAKE",
-        size: 54,
+        size: 56,
         font: FONT,
-        pos: k.vec2(MARGIN, 52),
+        pos: k.vec2(MARGIN, 54),
         color: C.ink,
-        glow: C.mint,
+        glow: C.accent,
         intensity: 1.1,
       });
 
-      panel({
-        pos: k.vec2(MARGIN, LEGEND_Y),
-        width: CONTENT_W,
-        height: ROW_H * SNACK_ORDER.length + 16,
-      });
+      // Compact snack strip: names and one-liners live on the help screen.
+      panel({ pos: k.vec2(MARGIN, STRIP_Y), width: CONTENT_W, height: 96 });
       SNACK_ORDER.forEach((type, i) => {
-        const y = LEGEND_Y + 24 + i * ROW_H;
-        drawSnack(k, theme, type, k.vec2(MARGIN + 42, y + 18), {
-          intensity: 0.85,
-        });
+        const x = MARGIN + 60 + i * 119;
+        drawSnack(k, theme, type, k.vec2(x, STRIP_Y + 34), { intensity: 0.9 });
         k.drawText({
           text: SNACK[type].name,
-          size: 19,
+          size: 11,
           font: FONT,
-          pos: k.vec2(MARGIN + 76, y + 4),
-          color: C.ink,
-        });
-        k.drawText({
-          text: SNACK[type].hint,
-          size: 14,
-          font: FONT,
-          pos: k.vec2(MARGIN + 76, y + 27),
+          pos: k.vec2(x, STRIP_Y + 64),
+          anchor: "center",
           color: C.mute,
+          letterSpacing: 1,
         });
-      });
-
-      panel({ pos: k.vec2(MARGIN, CHAIN_Y), width: CONTENT_W, height: 118 });
-      glowText({
-        text: "CHAIN SNACKS",
-        size: 16,
-        font: FONT,
-        pos: k.vec2(MARGIN + 24, CHAIN_Y + 20),
-        color: C.mintHi,
-        intensity: 0.8,
-      });
-      k.drawText({
-        text: `Bite again within ${COMBO_WINDOW}s to keep the chain: ×2 at 3, ×3 at 6, ×4 at 9. A bone breaks it. The snake speeds up as it grows.`,
-        size: 14,
-        font: FONT,
-        width: CONTENT_W - 48,
-        lineSpacing: 5,
-        pos: k.vec2(MARGIN + 24, CHAIN_Y + 44),
-        color: C.mute,
       });
 
       glowText({
         text: `BEST  ${store.readBest("classic")}`,
-        size: 22,
+        size: 23,
         font: FONT,
-        pos: k.vec2(MARGIN, 544),
-        color: C.mint,
+        pos: k.vec2(MARGIN, 300),
+        color: C.accent,
         intensity: 0.7,
       });
       glowText({
-        text: store.hasPlayedDaily(today)
-          ? `TODAY  ${store.readBest("daily", today)}`
-          : "TODAY  —",
-        size: 22,
+        text: playedToday ? `TODAY  ${store.readBest("daily", today)}` : "TODAY  —",
+        size: 23,
         font: FONT,
-        pos: k.vec2(W - MARGIN, 544),
+        pos: k.vec2(W - MARGIN, 300),
         anchor: "topright",
         color: C.volt,
-        intensity: store.hasPlayedDaily(today) ? 0.7 : 0.2,
+        intensity: playedToday ? 0.7 : 0.2,
+      });
+      k.drawText({
+        text: "Same board for everyone, once a day.",
+        size: 13,
+        font: FONT,
+        pos: k.vec2(W / 2, 348),
+        anchor: "center",
+        color: C.faint,
       });
 
       for (const p of painted) p.paint();
 
       k.drawText({
-        text: "Same board for everyone, once a day.",
+        text: "THEME",
+        size: 12,
+        font: FONT,
+        pos: k.vec2(W / 2, 766),
+        anchor: "center",
+        color: C.mute,
+        letterSpacing: 3,
+      });
+      THEME_NAMES.forEach((name, i) => {
+        const chosen = theme.name() === name;
+        const [r, g, b] = THEMES[name].accent;
+        glowRect({
+          pos: k.vec2(swatchX(i), SWATCH.y),
+          width: SWATCH.size,
+          height: SWATCH.size,
+          radius: 16,
+          color: k.rgb(r, g, b),
+          intensity: chosen ? 1 : 0.25,
+          outline: chosen ? { width: 3, color: C.ink } : null,
+        });
+      });
+
+      k.drawText({
+        text: "Arrows · WASD · swipe · on-screen pad",
         size: 13,
         font: FONT,
-        pos: k.vec2(W / 2, 800),
+        pos: k.vec2(W / 2, 872),
         anchor: "center",
         color: C.mute,
       });
       k.drawText({
-        text: "Arrows · WASD · swipe · on-screen pad     P pauses",
+        text: "SPACE play   ·   D daily   ·   H help",
         size: 13,
         font: FONT,
-        pos: k.vec2(W / 2, 852),
+        pos: k.vec2(W / 2, 900),
         anchor: "center",
-        color: C.mute,
-      });
-      k.drawText({
-        text: "SPACE play   ·   D daily",
-        size: 13,
-        font: FONT,
-        pos: k.vec2(W / 2, 880),
-        anchor: "center",
-        color: C.mintDim,
+        color: C.accentDim,
       });
     });
 
@@ -154,5 +182,6 @@ export function registerMenu(k, ctx) {
     k.onKeyPress("space", start("classic"));
     k.onKeyPress("enter", start("classic"));
     k.onKeyPress("d", start("daily"));
+    k.onKeyPress("h", () => k.go("help"));
   });
 }

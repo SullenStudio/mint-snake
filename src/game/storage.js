@@ -60,6 +60,14 @@ export function createStorage(backend = detectBackend()) {
       return read(bestKey("daily", seed)) !== null;
     },
 
+    readTheme() {
+      return read(`${PREFIX}theme`);
+    },
+
+    writeTheme(name) {
+      write(`${PREFIX}theme`, name);
+    },
+
     readPlays() {
       return readNumber(`${PREFIX}plays`);
     },
